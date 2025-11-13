@@ -1,0 +1,8 @@
+# Môi trường ảo của Python
+.venv/
+
+# Thư mục cache của Python
+__pycache__/
+
+# Thư mục cài đặt của VSCode
+.vscode/
