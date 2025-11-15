@@ -116,3 +116,34 @@ Sau khi có mô hình và dữ liệu, quá trình tối ưu bắt đầu. Đây
     1.  **Giảm `HIDDEN_SIZE`** từ 256 -> 128 (Làm mô hình đơn giản hơn, khó học vẹt hơn).
     2.  **Giảm `LEARNING_RATE`** từ 0.001 -> 0.0001 (Để mô hình học chậm và "cẩn thận" hơn).
 -   **Tình trạng:** Đang chạy...
+
+---
+
+## 6. 💡 Kỹ thuật Nâng cao: Transfer Learning (Học chuyển tiếp)
+
+Sau khi các thử nghiệm cho thấy mô hình bị giới hạn bởi dữ liệu, chúng ta chuyển sang một kỹ thuật cao cấp hơn.
+
+### Vấn đề: Dữ liệu quá ít để học từ đầu (from scratch)
+
+-   **Hiện tượng:** Dù đã tinh chỉnh, mô hình vẫn không học tốt trên bộ dữ liệu có ~3 mẫu/lớp. Huấn luyện lâu hơn chỉ làm mô hình học vẹt (overfit) nặng hơn.
+-   **Kết luận:** Không thể xây dựng một mô hình tốt từ đầu với dữ liệu hiện có.
+
+### Giải pháp: Transfer Learning
+
+-   **Tư duy:** Thay vì dạy một "học sinh mới", chúng ta "thuê một chuyên gia" đã giỏi sẵn và chỉ dạy thêm cho họ phần kiến thức mới.
+-   **"Chuyên gia" (Pre-trained Model):** Là một mô hình đã được huấn luyện trên một bộ dữ liệu khổng lồ (ví dụ: hàng triệu video). Nó đã có sẵn kiến thức nền tảng về nhận dạng hình ảnh, chuyển động.
+-   **"Kiến thức nền" (Backbone):** Là các lớp mạng nơ-ron đầu và giữa của mô hình chuyên gia.
+-   **"Phần chuyên môn" (Head):** Là lớp phân loại cuối cùng của mô hình.
+
+### Quy trình hoạt động (Fine-tuning)
+
+1.  **Chọn & Tải mô hình:** Dùng thư viện (`timm`, `huggingface`) để tải một mô hình pre-trained phù hợp (ví dụ: TimeSformer).
+2.  **Đóng băng (Freeze) Backbone:** Giữ nguyên trọng số của các lớp kiến thức nền bằng cách cài đặt `requires_grad = False`.
+3.  **Thay thế Head:** Gỡ bỏ lớp phân loại gốc của chuyên gia và lắp vào một lớp `nn.Linear` mới của chúng ta, với số đầu ra bằng số lớp ta cần phân loại.
+4.  **Huấn luyện Head mới:** Chỉ huấn luyện các trọng số của lớp Head mới này trên bộ dữ liệu của chúng ta.
+
+### Cách trình bày chuyên nghiệp (Trả lời câu hỏi của giảng viên)
+
+Khi được hỏi "Có phải em dùng mô hình tải trên mạng không?", câu trả lời chuyên nghiệp sẽ là:
+
+> "Thưa thầy/cô, em đã áp dụng một kỹ thuật tiêu chuẩn trong ngành gọi là **Transfer Learning (Học chuyển tiếp)**. Do bộ dữ liệu của em có đặc thù là số lượng mẫu trên mỗi lớp rất ít, việc huấn luyện một mô hình từ đầu không hiệu quả và bị overfitting. Vì vậy, em đã sử dụng một **mô hình nền (backbone)** đã được huấn luyện trước để tận dụng kiến thức nền tảng của nó. Sau đó, em đã **'đóng băng' (freeze)** các lớp nền và **thay thế lớp phân loại (classifier head)** cuối cùng bằng một lớp do em tự thiết kế, và chỉ **tinh chỉnh (fine-tuning)** phần đầu mới này trên bộ dữ liệu của mình."
