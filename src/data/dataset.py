@@ -20,14 +20,20 @@ class SignLanguageDataset(Dataset):
         self.transform = transform
 
         # --- LỌC DATASET ĐỂ GIỮ LẠI N LỚP PHỔ BIẾN NHẤT ---
-        NUM_CLASSES_TO_KEEP = 50 # Tăng số lớp lên 50 để thử nghiệm
-        print(f"--- LƯU Ý: Chỉ giữ lại {NUM_CLASSES_TO_KEEP} lớp (ký hiệu) phổ biến nhất để huấn luyện ---")
+        # --- SANITY CHECK: Chỉ giữ lại 4 mẫu từ 2 lớp đầu tiên ---
+        NUM_CLASSES_TO_KEEP = 2
+        SAMPLES_TO_KEEP = 4
+        print(f"--- LƯU Ý: ĐANG TRONG CHẾ ĐỘ SANITY CHECK ---")
+        print(f"--- Giữ lại {SAMPLES_TO_KEEP} mẫu từ {NUM_CLASSES_TO_KEEP} lớp đầu tiên ---")
 
         # Tìm N lớp phổ biến nhất
         top_labels = full_labels_df['label'].value_counts().nlargest(NUM_CLASSES_TO_KEEP).index.tolist()
 
         # Lọc dataframe để chỉ chứa các mẫu thuộc các lớp này
         self.labels_df = full_labels_df[full_labels_df['label'].isin(top_labels)].reset_index(drop=True)
+
+        # Giữ lại chỉ SAMPLES_TO_KEEP mẫu đầu tiên
+        self.labels_df = self.labels_df.head(SAMPLES_TO_KEEP)
         
         print(f"Các lớp được giữ lại: {top_labels}")
         print(f"Số lượng mẫu sau khi lọc: {len(self.labels_df)}")

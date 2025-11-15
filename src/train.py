@@ -19,14 +19,14 @@ LABELS_FILE = "data/VietSignLive/labels.csv"
 
 # Siêu tham số cho mô hình
 INPUT_SIZE = 258      # Số đặc trưng landmarks cho mỗi frame
-HIDDEN_SIZE = 128     # Kích thước của hidden state trong LSTM (Giảm để chống overfitting)
+HIDDEN_SIZE = 256     # Kích thước của hidden state trong LSTM
 NUM_LAYERS = 2        # Số lớp LSTM xếp chồng
 DROPOUT_RATE = 0.5    # Tỷ lệ dropout
 
 # Siêu tham số cho quá trình huấn luyện
-NUM_EPOCHS = 50       # Số lần lặp qua toàn bộ dataset
-BATCH_SIZE = 64       # Số lượng mẫu trong một batch
-LEARNING_RATE = 0.0001 # Tốc độ học của optimizer (Giảm để học cẩn thận hơn)
+NUM_EPOCHS = 100      # Tăng số epoch cho sanity check
+BATCH_SIZE = 4        # Giảm batch size cho sanity check
+LEARNING_RATE = 0.001 # Tốc độ học của optimizer
 VALIDATION_SPLIT = 0.2 # Tỷ lệ dữ liệu dùng cho validation (20%)
 MODEL_SAVE_PATH = "viet_sign_live_bilstm.pth" # Tên file để lưu mô hình
 
@@ -83,12 +83,6 @@ def train():
         # Sử dụng tqdm để tạo thanh tiến trình
         train_progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS} [Training]")
         for inputs, labels in train_progress_bar:
-            # --- DATA AUGMENTATION: Thêm nhiễu ngẫu nhiên ---
-            # Chỉ áp dụng trong quá trình training
-            noise = torch.randn(inputs.size()) * 0.01  # Tạo nhiễu nhỏ
-            inputs = inputs + noise
-            # ---------------------------------------------
-
             # Chuyển dữ liệu lên thiết bị (CPU/GPU)
             inputs = inputs.to(device)
             labels = labels.to(device)
