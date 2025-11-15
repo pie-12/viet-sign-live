@@ -20,7 +20,7 @@ class SignLanguageDataset(Dataset):
         self.transform = transform
 
         # --- LỌC DATASET ĐỂ GIỮ LẠI N LỚP PHỔ BIẾN NHẤT ---
-        NUM_CLASSES_TO_KEEP = 10 # Bắt đầu với 10 lớp
+        NUM_CLASSES_TO_KEEP = 30 # Tăng số lớp lên 30 để thử nghiệm
         print(f"--- LƯU Ý: Chỉ giữ lại {NUM_CLASSES_TO_KEEP} lớp (ký hiệu) phổ biến nhất để huấn luyện ---")
 
         # Tìm N lớp phổ biến nhất
