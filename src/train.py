@@ -149,7 +149,8 @@ def train():
 if __name__ == "__main__":
     # Cài đặt thư viện tqdm nếu chưa có
     try:
-        import tqdm
+        # import tqdm # Dòng này gây lỗi, đã được xóa
+        pass
     except ImportError:
         print("Đang cài đặt thư viện 'tqdm' để hiển thị thanh tiến trình...")
         import subprocess
