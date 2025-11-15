@@ -14,8 +14,8 @@ from models.model import BiLSTMClassifier
 # --- 1. CẤU HÌNH & SIÊU THAM SỐ (HYPERPARAMETERS) ---
 
 # Đường dẫn dữ liệu
-DATA_DIR = r"D:\Dataset\VietSignLive\processed_data"
-LABELS_FILE = r"D:\Dataset\VietSignLive\labels.csv"
+DATA_DIR = "data/VietSignLive/processed_data"
+LABELS_FILE = "data/VietSignLive/labels.csv"
 
 # Siêu tham số cho mô hình
 INPUT_SIZE = 258      # Số đặc trưng landmarks cho mỗi frame
