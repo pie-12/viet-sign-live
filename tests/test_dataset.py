@@ -1,6 +1,6 @@
 # test_dataset.py
 
-from dataset import SignLanguageDataset
+from src.data.dataset import SignLanguageDataset
 import os
 import torch
 

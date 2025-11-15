@@ -1,6 +1,6 @@
 # test_dataloader.py
 
-from dataset import SignLanguageDataset
+from src.data.dataset import SignLanguageDataset
 from torch.utils.data import DataLoader
 import os
 import torch
