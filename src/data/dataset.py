@@ -16,8 +16,22 @@ class SignLanguageDataset(Dataset):
             transform (callable, optional): Một hàm biến đổi tùy chọn để áp dụng cho dữ liệu.
         """
         self.data_dir = data_dir
-        self.labels_df = pd.read_csv(labels_file) # Đọc file labels.csv bằng pandas
+        full_labels_df = pd.read_csv(labels_file)
         self.transform = transform
+
+        # --- LỌC DATASET ĐỂ GIỮ LẠI N LỚP PHỔ BIẾN NHẤT ---
+        NUM_CLASSES_TO_KEEP = 10 # Bắt đầu với 10 lớp
+        print(f"--- LƯU Ý: Chỉ giữ lại {NUM_CLASSES_TO_KEEP} lớp (ký hiệu) phổ biến nhất để huấn luyện ---")
+
+        # Tìm N lớp phổ biến nhất
+        top_labels = full_labels_df['label'].value_counts().nlargest(NUM_CLASSES_TO_KEEP).index.tolist()
+
+        # Lọc dataframe để chỉ chứa các mẫu thuộc các lớp này
+        self.labels_df = full_labels_df[full_labels_df['label'].isin(top_labels)].reset_index(drop=True)
+        
+        print(f"Các lớp được giữ lại: {top_labels}")
+        print(f"Số lượng mẫu sau khi lọc: {len(self.labels_df)}")
+
 
         # Ánh xạ các nhãn (tên ký hiệu) thành các số nguyên (ID)
         # Ví dụ: "XIN CHAO" -> 0, "CAM ON" -> 1, ...
