@@ -44,8 +44,11 @@ class SignLanguageDataset(Dataset):
         """
         # Lấy thông tin về mẫu dữ liệu từ DataFrame
         row = self.labels_df.iloc[idx]
-        npy_file_name = row['file_name'] # Tên file .npy
+        mp4_file_name = row['filename']  # Lấy tên file .mp4 từ cột 'filename'
         label_str = row['label']         # Nhãn dạng chuỗi (ví dụ: "XIN CHAO")
+
+        # Thay đổi đuôi file từ .mp4 thành .npy
+        npy_file_name = mp4_file_name.replace('.mp4', '.npy')
 
         # Xây dựng đường dẫn đầy đủ đến file .npy
         npy_file_path = os.path.join(self.data_dir, npy_file_name)
