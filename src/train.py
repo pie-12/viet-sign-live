@@ -83,6 +83,12 @@ def train():
         # Sử dụng tqdm để tạo thanh tiến trình
         train_progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS} [Training]")
         for inputs, labels in train_progress_bar:
+            # --- DATA AUGMENTATION: Thêm nhiễu ngẫu nhiên ---
+            # Chỉ áp dụng trong quá trình training
+            noise = torch.randn(inputs.size()) * 0.01  # Tạo nhiễu nhỏ
+            inputs = inputs + noise
+            # ---------------------------------------------
+
             # Chuyển dữ liệu lên thiết bị (CPU/GPU)
             inputs = inputs.to(device)
             labels = labels.to(device)
