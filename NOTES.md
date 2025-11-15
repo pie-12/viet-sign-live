@@ -80,3 +80,39 @@ Dự án áp dụng kiến trúc 2-Mô-hình:
 
 -   **Xây dựng kiến trúc mô hình Bi-LSTM** bằng các lớp (layers) của PyTorch.
 -   Viết vòng lặp huấn luyện (training loop) để đưa dữ liệu từ `DataLoader` vào mô hình, tính toán `loss`, và dùng `optimizer` để cập nhật mô hình.
+
+---
+
+## 5. 🔬 Quy trình Thử nghiệm & Tối ưu
+
+Sau khi có mô hình và dữ liệu, quá trình tối ưu bắt đầu. Đây là nhật ký các thử nghiệm và kết quả.
+
+### Vấn đề ban đầu: `Val Accuracy` ~ 0% (Thất bại khi huấn luyện)
+
+-   **Hiện tượng:** Khi huấn luyện trên toàn bộ dataset (~4300 mẫu, ~3300 lớp), `Val Accuracy` không tăng và luôn ở mức ~0%.
+-   **Chẩn đoán:** Dữ liệu quá thưa (sparse), trung bình chỉ có ~1.3 video cho mỗi ký hiệu. Mô hình không có đủ ví dụ để học và khái quát hóa.
+
+### Thử nghiệm 1: Thu nhỏ bài toán (10 lớp)
+
+-   **Hành động:** Chỉnh sửa `dataset.py` để chỉ giữ lại 10 lớp có nhiều mẫu nhất.
+-   **Kết quả:** `Val Accuracy` đạt **14.29%**.
+-   **Bài học:** **Thành công!** Chúng ta đã chứng minh được kiến trúc mô hình và pipeline dữ liệu cơ bản là đúng. Mô hình CÓ THỂ HỌC. Vấn đề nằm ở quy mô dữ liệu.
+
+### Thử nghiệm 2: Mở rộng bài toán (30 lớp)
+
+-   **Hành động:** Tăng số lớp được giữ lại lên 30.
+-   **Kết quả:** `Val Accuracy` chỉ đạt ~5.26%. `Train Loss` giảm nhưng `Val Loss` tăng.
+-   **Bài học:** Hiện tượng **Overfitting (Học vẹt)** xảy ra nghiêm trọng. Mô hình quá phức tạp so với lượng dữ liệu ít ỏi, nó chỉ "nhớ" đáp án của tập training chứ không thực sự học.
+
+### Thử nghiệm 3: Chống Overfitting bằng Data Augmentation
+
+-   **Hành động:** Thêm một lượng nhiễu (noise) ngẫu nhiên và rất nhỏ vào dữ liệu của mỗi batch **training**. Điều này buộc mô hình phải học các đặc trưng cốt lõi thay vì nhớ các toạ độ chính xác.
+-   **Kết quả:** `Val Accuracy` trên bộ 30 lớp tăng gấp đôi, đạt **10.53%**.
+-   **Bài học:** Data Augmentation là một kỹ thuật hiệu quả để chống overfitting, giúp mô hình khái quát hóa tốt hơn.
+
+### Thử nghiệm 4: Chống Overfitting bằng Hyperparameter Tuning
+
+-   **Hành động:**
+    1.  **Giảm `HIDDEN_SIZE`** từ 256 -> 128 (Làm mô hình đơn giản hơn, khó học vẹt hơn).
+    2.  **Giảm `LEARNING_RATE`** từ 0.001 -> 0.0001 (Để mô hình học chậm và "cẩn thận" hơn).
+-   **Tình trạng:** Đang chạy...
