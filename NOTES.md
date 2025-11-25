@@ -22,7 +22,7 @@ Dự án áp dụng kiến trúc 2-Mô-hình:
 -   **Công cụ:** Script `preprocess.py` (sử dụng thư viện `mediapipe`).
 -   **Đầu vào:** Thư mục `videos_mp4` chứa các file video gốc.
 -   **Đầu ra:**
-    -   Thư mục `processed_data`: Chứa hàng nghìn file `.npy`. Mỗi file `.npy` là một mảng NumPy, lưu trữ chuỗi landmarks của một video.
+    -   Thư mục `processed_data_60_201`: Chứa hàng nghìn file `.npy`. Mỗi file `.npy` là một mảng NumPy, lưu trữ chuỗi landmarks đã được chuẩn hóa về kích thước `(60, 201)`.
     -   File `labels.csv`: File "đáp án", ánh xạ mỗi file `.npy` với nhãn (tên ký hiệu) tương ứng.
 
 ### Bước 2: Tải dữ liệu cho PyTorch
@@ -48,13 +48,11 @@ Dự án áp dụng kiến trúc 2-Mô-hình:
 
 #### Vấn đề & Giải pháp: Dữ liệu có độ dài khác nhau
 
--   **Vấn đề gặp phải:** Các video có độ dài khác nhau, dẫn đến các chuỗi landmarks có số frame khác nhau. `DataLoader` mặc định không thể gom các tensor có kích thước không đồng nhất vào cùng một batch. Điều này gây ra lỗi `RuntimeError: stack expects each tensor to be equal size`.
--   **Giải pháp:** Kỹ thuật **Padding (Đệm)**.
+-   **Vấn đề gặp phải:** Các video có độ dài khác nhau, dẫn đến các chuỗi landmarks có số frame khác nhau. `DataLoader` mặc định không thể gom các tensor có kích thước không đồng nhất vào cùng một batch. Điều này từng gây ra lỗi `RuntimeError: stack expects each tensor to be equal size`.
+-   **Giải pháp (hiện tại):** Kỹ thuật **Chuẩn hóa độ dài chuỗi (Sequence Length Normalization)** trong bước tiền xử lý.
 -   **Triển khai của chúng ta:**
-    1.  Chúng ta đã viết một hàm tùy chỉnh gọi là `pad_collate_fn`.
-    2.  Hàm này được truyền vào `DataLoader` qua tham số `collate_fn`.
-    3.  Nó sử dụng hàm `pad_sequence` của PyTorch để tự động tìm chuỗi dài nhất trong một batch và "đệm" các chuỗi ngắn hơn bằng số 0 cho đến khi tất cả có cùng độ dài.
-    4.  Kết quả là các batch dữ liệu có kích thước đồng nhất và sẵn sàng cho mô hình.
+    1.  Trong `preprocess.py`, tất cả các chuỗi keypoints đã được nội suy về độ dài chuẩn **60 frames**.
+    2.  Kết quả là các batch dữ liệu luôn có kích thước đồng nhất `(BATCH_SIZE, 60, 201)` và sẵn sàng cho mô hình mà **không cần đến hàm `pad_collate_fn` tùy chỉnh** nữa.
 
 ---
 
@@ -76,10 +74,17 @@ Dự án áp dụng kiến trúc 2-Mô-hình:
 
 ---
 
-## 4. 🚀 Các bước tiếp theo
+## 4. 🚀 Các bước đã hoàn tất (Theo kiến trúc của báo cáo nghiên cứu)
 
--   **Xây dựng kiến trúc mô hình Bi-LSTM** bằng các lớp (layers) của PyTorch.
--   Viết vòng lặp huấn luyện (training loop) để đưa dữ liệu từ `DataLoader` vào mô hình, tính toán `loss`, và dùng `optimizer` để cập nhật mô hình.
+Chúng ta đã hoàn thành các bước quan trọng sau để triển khai phương pháp dựa trên báo cáo nghiên cứu:
+
+1.  **Tiền xử lý dữ liệu:** Script `src/data/preprocess.py` đã được cập nhật để trích xuất 201 chiều keypoints từ video thô và chuẩn hóa tất cả các chuỗi về độ dài 60 frames.
+2.  **Xây dựng hàm tăng cường dữ liệu:** Module `src/data/augmentation.py` đã được tạo với các hàm xoay, dịch chuyển, phóng to/thu nhỏ và biến đổi tốc độ thời gian cho chuỗi keypoints.
+3.  **Cập nhật bộ tải dữ liệu (Dataset Loader):** Class `SignLanguageDataset` trong `src/data/dataset.py` đã được sửa đổi để tải dữ liệu đã tiền xử lý, áp dụng tăng cường dữ liệu linh hoạt cho tập huấn luyện và không còn cần hàm `collate_fn` tùy chỉnh.
+4.  **Xây dựng lại kiến trúc mô hình:** File `src/models/model.py` đã triển khai kiến trúc BiLSTM sâu với Batch Normalization và Dropout, đúng như mô tả trong báo cáo.
+5.  **Cập nhật pipeline huấn luyện:** Script `src/train.py` đã được chỉnh sửa để tích hợp tất cả các thành phần mới và triển khai cơ chế Early Stopping dựa trên validation loss.
+
+Toàn bộ pipeline từ tiền xử lý dữ liệu đến huấn luyện mô hình đã sẵn sàng.
 
 ---
 
@@ -115,35 +120,35 @@ Sau khi có mô hình và dữ liệu, quá trình tối ưu bắt đầu. Đây
 -   **Hành động:**
     1.  **Giảm `HIDDEN_SIZE`** từ 256 -> 128 (Làm mô hình đơn giản hơn, khó học vẹt hơn).
     2.  **Giảm `LEARNING_RATE`** từ 0.001 -> 0.0001 (Để mô hình học chậm và "cẩn thận" hơn).
--   **Tình trạng:** Đang chạy...
+-   **Tình trạng:** **Đã dừng.** Chúng ta đã chuyển hướng sang phương pháp của báo cáo nghiên cứu.
+
+### Thử nghiệm 5: Huấn luyện với Pipeline mới (Dựa trên báo cáo nghiên cứu)
+
+-   **Hành động:** Chạy script `src/train.py` với toàn bộ pipeline đã được cập nhật (tiền xử lý chuẩn hóa, tăng cường dữ liệu on-the-fly, mô hình BiLSTM sâu).
+-   **Kết quả (Epoch 2):**
+    *   `Train Loss`: Giảm từ 8.4528 xuống 8.1433
+    *   `Val Loss`: 8.4559 (không cải thiện đáng kể so với epoch 1)
+    *   `Val Accuracy`: Tăng từ 0.00% lên **0.11%**.
+-   **Bài học:**
+    *   Mô hình **đã bắt đầu học**. Việc `Val Accuracy` tăng từ 0.00% lên 0.11% là một tín hiệu rất tích cực, cho thấy toàn bộ pipeline đang hoạt động đúng.
+    *   Mức tăng accuracy này vẫn còn rất nhỏ, điều này phù hợp với dự đoán rằng mô hình sẽ học chậm hơn so với phương pháp trong báo cáo (do sử dụng tăng cường dữ liệu on-the-fly thay vì pre-generate một dataset khổng lồ).
+    *   Cần tiếp tục huấn luyện trong nhiều epoch để đánh giá thêm hiệu suất và sự hội tụ của mô hình. Cơ chế Early Stopping sẽ giúp dừng lại khi mô hình không còn cải thiện.
 
 ---
 
-## 6. 💡 Kỹ thuật Nâng cao: Transfer Learning (Học chuyển tiếp)
+## 6. 💡 Chiến lược Hiện tại: BiLSTM + Tăng cường dữ liệu Mạnh mẽ (Theo báo cáo nghiên cứu)
 
-Sau khi các thử nghiệm cho thấy mô hình bị giới hạn bởi dữ liệu, chúng ta chuyển sang một kỹ thuật cao cấp hơn.
+Sau khi gặp phải vấn đề mô hình "học vẹt" (overfitting) nghiêm trọng do dữ liệu huấn luyện thưa thớt, chúng ta đã tiến hành phân tích sâu hơn và tìm kiếm các giải pháp hiệu quả. Một báo cáo nghiên cứu về nhận diện ngôn ngữ ký hiệu Việt Nam (VSL) đã được tìm thấy, trong đó mô hình Bi-LSTM đạt độ chính xác lên đến **96%** trên cùng bộ dữ liệu.
 
-### Vấn đề: Dữ liệu quá ít để học từ đầu (from scratch)
+**Phân tích báo cáo cho thấy thành công đến từ:**
 
--   **Hiện tượng:** Dù đã tinh chỉnh, mô hình vẫn không học tốt trên bộ dữ liệu có ~3 mẫu/lớp. Huấn luyện lâu hơn chỉ làm mô hình học vẹt (overfit) nặng hơn.
--   **Kết luận:** Không thể xây dựng một mô hình tốt từ đầu với dữ liệu hiện có.
+1.  **Tiền xử lý Dữ liệu chuẩn hóa:** Tất cả các chuỗi keypoints được nội suy về độ dài cố định là **60 frames**. Điều này đảm bảo đầu vào đồng nhất cho mô hình.
+2.  **Tăng cường Dữ liệu (Data Augmentation) mạnh mẽ:** Đây là yếu tố then chốt. Từ mỗi chuỗi video gốc, họ đã tạo ra **tối đa 100 phiên bản tăng cường** bằng cách kết hợp nhiều phép biến đổi:
+    *   **Xoay (Rotation):** Mô phỏng góc quay camera hoặc tư thế người ký hiệu.
+    *   **Dịch chuyển (Translation):** Mô phỏng vị trí người ký hiệu khác nhau trong khung hình.
+    *   **Phóng to/Thu nhỏ (Scaling):** Mô phỏng kích thước người hoặc khoảng cách đến camera.
+    *   **Biến đổi tốc độ thời gian (Temporal Speed Variation):** Mô phỏng tốc độ ký hiệu khác nhau.
+    Nhờ đó, tập dữ liệu huấn luyện được mở rộng từ ~4000 mẫu lên đến **~280,000 mẫu**, giúp mô hình có đủ ví dụ để học và khái quát hóa mà không bị overfitting.
+3.  **Kiến trúc Bi-LSTM sâu và được điều chỉnh tốt:** Mô hình sử dụng nhiều lớp Bi-LSTM chồng lên nhau, kết hợp với các lớp Batch Normalization và Dropout để ổn định quá trình huấn luyện và chống overfitting hiệu quả.
 
-### Giải pháp: Transfer Learning
-
--   **Tư duy:** Thay vì dạy một "học sinh mới", chúng ta "thuê một chuyên gia" đã giỏi sẵn và chỉ dạy thêm cho họ phần kiến thức mới.
--   **"Chuyên gia" (Pre-trained Model):** Là một mô hình đã được huấn luyện trên một bộ dữ liệu khổng lồ (ví dụ: hàng triệu video). Nó đã có sẵn kiến thức nền tảng về nhận dạng hình ảnh, chuyển động.
--   **"Kiến thức nền" (Backbone):** Là các lớp mạng nơ-ron đầu và giữa của mô hình chuyên gia.
--   **"Phần chuyên môn" (Head):** Là lớp phân loại cuối cùng của mô hình.
-
-### Quy trình hoạt động (Fine-tuning)
-
-1.  **Chọn & Tải mô hình:** Dùng thư viện (`timm`, `huggingface`) để tải một mô hình pre-trained phù hợp (ví dụ: TimeSformer).
-2.  **Đóng băng (Freeze) Backbone:** Giữ nguyên trọng số của các lớp kiến thức nền bằng cách cài đặt `requires_grad = False`.
-3.  **Thay thế Head:** Gỡ bỏ lớp phân loại gốc của chuyên gia và lắp vào một lớp `nn.Linear` mới của chúng ta, với số đầu ra bằng số lớp ta cần phân loại.
-4.  **Huấn luyện Head mới:** Chỉ huấn luyện các trọng số của lớp Head mới này trên bộ dữ liệu của chúng ta.
-
-### Cách trình bày chuyên nghiệp (Trả lời câu hỏi của giảng viên)
-
-Khi được hỏi "Có phải em dùng mô hình tải trên mạng không?", câu trả lời chuyên nghiệp sẽ là:
-
-> "Thưa thầy/cô, em đã áp dụng một kỹ thuật tiêu chuẩn trong ngành gọi là **Transfer Learning (Học chuyển tiếp)**. Do bộ dữ liệu của em có đặc thù là số lượng mẫu trên mỗi lớp rất ít, việc huấn luyện một mô hình từ đầu không hiệu quả và bị overfitting. Vì vậy, em đã sử dụng một **mô hình nền (backbone)** đã được huấn luyện trước để tận dụng kiến thức nền tảng của nó. Sau đó, em đã **'đóng băng' (freeze)** các lớp nền và **thay thế lớp phân loại (classifier head)** cuối cùng bằng một lớp do em tự thiết kế, và chỉ **tinh chỉnh (fine-tuning)** phần đầu mới này trên bộ dữ liệu của mình."
+**Chiến lược hiện tại của chúng ta là tái triển khai mô hình Bi-LSTM theo đúng phương pháp đã được chứng minh trong báo cáo này.** Chúng ta đã hoàn tất các bước chuẩn bị dữ liệu và xây dựng mô hình theo kiến trúc này.

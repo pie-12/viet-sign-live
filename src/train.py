@@ -6,29 +6,38 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 import os
 from tqdm import tqdm # Thư viện để tạo thanh tiến trình (progress bar)
+import numpy as np # Import numpy for best_val_loss initialization
 
 from data.dataset import SignLanguageDataset
-from data.utils import pad_collate_fn
+# from data.utils import pad_collate_fn # Không còn cần thiết
 from models.model import BiLSTMClassifier
 
 # --- 1. CẤU HÌNH & SIÊU THAM SỐ (HYPERPARAMETERS) ---
 
 # Đường dẫn dữ liệu
-DATA_DIR = "data/VietSignLive/processed_data"
-LABELS_FILE = "data/VietSignLive/labels.csv"
-
-# Siêu tham số cho mô hình
-INPUT_SIZE = 258      # Số đặc trưng landmarks cho mỗi frame
-HIDDEN_SIZE = 256     # Kích thước của hidden state trong LSTM
-NUM_LAYERS = 2        # Số lớp LSTM xếp chồng
-DROPOUT_RATE = 0.5    # Tỷ lệ dropout
+# Dữ liệu nằm trong thư mục 'data' của dự án
+# For Kaggle, point to the absolute path of the input dataset
+KAGGLE_DATA_ROOT = '/kaggle/input/viet-sign-language-data'
+if os.path.exists(KAGGLE_DATA_ROOT):
+    PROCESSED_DATA_DIR = os.path.join(KAGGLE_DATA_ROOT, 'processed_data_60_201')
+    LABELS_CSV_PATH = os.path.join(KAGGLE_DATA_ROOT, 'labels.csv')
+else: # Local fallback
+    PROCESSED_DATA_DIR = os.path.join('data', 'processed_data_60_201')
+    LABELS_CSV_PATH = os.path.join('data', 'labels.csv')
 
 # Siêu tham số cho quá trình huấn luyện
-NUM_EPOCHS = 100      # Tăng số epoch cho sanity check
-BATCH_SIZE = 4        # Giảm batch size cho sanity check
-LEARNING_RATE = 0.001 # Tốc độ học của optimizer
+NUM_EPOCHS = 100      # Số epoch tối đa
+BATCH_SIZE = 32       # Kích thước batch, như trong báo cáo
+LEARNING_RATE = 0.001 # Tốc độ học, như trong báo cáo
 VALIDATION_SPLIT = 0.2 # Tỷ lệ dữ liệu dùng cho validation (20%)
-MODEL_SAVE_PATH = "viet_sign_live_bilstm.pth" # Tên file để lưu mô hình
+
+# Early Stopping (như trong báo cáo)
+EARLY_STOPPING_PATIENCE = 10 # Dừng nếu val loss không cải thiện sau 10 epoch
+# For Kaggle, save to the writable /kaggle/working/ directory
+if os.path.exists('/kaggle/working/'):
+    MODEL_SAVE_PATH = "/kaggle/working/viet_sign_live_bilstm_best_model.pth"
+else: # Local fallback
+    MODEL_SAVE_PATH = "viet_sign_live_bilstm_best_model.pth" # Tên file để lưu mô hình tốt nhất
 
 def train():
     print("--- Bắt đầu quá trình huấn luyện ---")
@@ -39,69 +48,84 @@ def train():
 
     # --- 3. CHUẨN BỊ DỮ LIỆU ---
     print("Đang tải và chuẩn bị dữ liệu...")
-    full_dataset = SignLanguageDataset(data_dir=DATA_DIR, labels_file=LABELS_FILE)
     
-    # Lấy số lượng lớp từ dataset
-    num_classes = len(full_dataset.label_to_id)
+    # Dataset đầy đủ (chưa chia train/val, không augmentation) để lấy thông tin tổng quan
+    full_dataset_info = SignLanguageDataset(
+        processed_data_dir=PROCESSED_DATA_DIR, 
+        labels_csv_path=LABELS_CSV_PATH,
+        apply_augmentation=False # Không augmentation để tránh tạo ra dữ liệu trùng lặp khi chia
+    )
+    
+    num_classes = len(full_dataset_info.label_to_id)
     print(f"Tổng số lớp (ký hiệu): {num_classes}")
 
     # Chia dataset thành tập training và validation
-    val_size = int(len(full_dataset) * VALIDATION_SPLIT)
-    train_size = len(full_dataset) - val_size
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    val_size = int(len(full_dataset_info) * VALIDATION_SPLIT)
+    train_size = len(full_dataset_info) - val_size
+    
+    # random_split trả về các chỉ mục, không phải các instance dataset riêng biệt
+    # Do đó, cần tạo lại dataset cho train và val với apply_augmentation phù hợp
+    indices = list(range(len(full_dataset_info)))
+    np.random.shuffle(indices) # Đảm bảo chia ngẫu nhiên
+    
+    train_indices = indices[val_size:]
+    val_indices = indices[:val_size]
+
+    # Tạo dataset cho training (có augmentation) và validation (không augmentation)
+    train_full_dataset = SignLanguageDataset(
+        processed_data_dir=PROCESSED_DATA_DIR,
+        labels_csv_path=LABELS_CSV_PATH,
+        apply_augmentation=True # Bật augmentation cho tập huấn luyện
+    )
+    train_dataset = torch.utils.data.Subset(train_full_dataset, train_indices)
+
+    val_full_dataset = SignLanguageDataset(
+        processed_data_dir=PROCESSED_DATA_DIR,
+        labels_csv_path=LABELS_CSV_PATH,
+        apply_augmentation=False # Không augmentation cho tập validation
+    )
+    val_dataset = torch.utils.data.Subset(val_full_dataset, val_indices)
+    
     print(f"Kích thước tập training: {len(train_dataset)}")
     print(f"Kích thước tập validation: {len(val_dataset)}")
 
-    # Tạo DataLoader cho training và validation
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=pad_collate_fn, num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, collate_fn=pad_collate_fn, num_workers=2)
+    # Tạo DataLoader cho training và validation (không cần collate_fn tùy chỉnh nữa)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
 
     # --- 4. KHỞI TẠO MÔ HÌNH, LOSS, OPTIMIZER ---
     print("Đang khởi tạo mô hình...")
-    model = BiLSTMClassifier(
-        input_size=INPUT_SIZE,
-        hidden_size=HIDDEN_SIZE,
-        num_layers=NUM_LAYERS,
-        num_classes=num_classes,
-        dropout_rate=DROPOUT_RATE
-    ).to(device)
+    # Mô hình BiLSTMClassifier mới chỉ cần num_classes
+    model = BiLSTMClassifier(num_classes=num_classes).to(device)
 
-    # Loss function (Hàm mất mát)
+    # Loss function (Hàm mất mát) - CrossEntropyLoss đã bao gồm softmax
     criterion = nn.CrossEntropyLoss()
 
-    # Optimizer (Bộ tối ưu hóa)
+    # Optimizer (Bộ tối ưu hóa) - Adam như trong báo cáo
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     # --- 5. VÒNG LẶP HUẤN LUYỆN ---
-    best_val_accuracy = 0.0
+    best_val_loss = float('inf') # Theo dõi validation loss tốt nhất
+    patience_counter = 0         # Bộ đếm cho Early Stopping
 
     for epoch in range(NUM_EPOCHS):
         # ** Giai đoạn Training **
         model.train() # Đặt mô hình ở chế độ training
         running_train_loss = 0.0
         
-        # Sử dụng tqdm để tạo thanh tiến trình
         train_progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{NUM_EPOCHS} [Training]")
         for inputs, labels in train_progress_bar:
-            # Chuyển dữ liệu lên thiết bị (CPU/GPU)
             inputs = inputs.to(device)
             labels = labels.to(device)
 
-            # 1. Zero the parameter gradients (Reset gradient)
             optimizer.zero_grad()
-
-            # 2. Forward pass
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-
-            # 3. Backward pass
             loss.backward()
-
-            # 4. Optimize (Cập nhật trọng số)
             optimizer.step()
 
             running_train_loss += loss.item()
-            train_progress_bar.set_postfix(loss=loss.item())
+            train_progress_bar.set_postfix(loss=f"{loss.item():.4f}")
 
         avg_train_loss = running_train_loss / len(train_loader)
 
@@ -121,40 +145,37 @@ def train():
                 loss = criterion(outputs, labels)
                 running_val_loss += loss.item()
 
-                # Tính accuracy
                 _, predicted = torch.max(outputs.data, 1)
                 total_predictions += labels.size(0)
                 correct_predictions += (predicted == labels).sum().item()
                 
-                val_progress_bar.set_postfix(loss=loss.item())
+                val_progress_bar.set_postfix(loss=f"{loss.item():.4f}")
 
         avg_val_loss = running_val_loss / len(val_loader)
         val_accuracy = (correct_predictions / total_predictions) * 100
 
-        print(f"Epoch [{epoch+1}/{NUM_EPOCHS}] - "
+        print(f"\nEpoch [{epoch+1}/{NUM_EPOCHS}] - "
               f"Train Loss: {avg_train_loss:.4f}, "
               f"Val Loss: {avg_val_loss:.4f}, "
               f"Val Accuracy: {val_accuracy:.2f}%")
 
-        # Lưu lại mô hình nếu có kết quả validation tốt hơn
-        if val_accuracy > best_val_accuracy:
-            best_val_accuracy = val_accuracy
+        # --- Early Stopping Logic ---
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            patience_counter = 0
             torch.save(model.state_dict(), MODEL_SAVE_PATH)
-            print(f"Đã lưu mô hình mới với Val Accuracy tốt hơn: {best_val_accuracy:.2f}% tại '{MODEL_SAVE_PATH}'")
+            print(f"Đã lưu mô hình mới với Val Loss tốt hơn: {best_val_loss:.4f} tại '{MODEL_SAVE_PATH}'")
+        else:
+            patience_counter += 1
+            print(f"Val Loss không cải thiện. Patience: {patience_counter}/{EARLY_STOPPING_PATIENCE}")
+            if patience_counter >= EARLY_STOPPING_PATIENCE:
+                print(f"Dừng sớm: Val Loss không cải thiện sau {EARLY_STOPPING_PATIENCE} epoch.")
+                break
 
     print("--- Quá trình huấn luyện hoàn tất ---")
-    print(f"Mô hình đã được lưu tại '{MODEL_SAVE_PATH}' với Val Accuracy tốt nhất là {best_val_accuracy:.2f}%")
+    print(f"Mô hình tốt nhất đã được lưu tại '{MODEL_SAVE_PATH}' với Val Loss tốt nhất là {best_val_loss:.4f}")
 
 
 if __name__ == "__main__":
-    # Cài đặt thư viện tqdm nếu chưa có
-    try:
-        # import tqdm # Dòng này gây lỗi, đã được xóa
-        pass
-    except ImportError:
-        print("Đang cài đặt thư viện 'tqdm' để hiển thị thanh tiến trình...")
-        import subprocess
-        import sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm"])
-
+    # Cài đặt thư viện tqdm nếu chưa có (đã có trong requirements.txt)
     train()

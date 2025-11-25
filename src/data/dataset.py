@@ -5,48 +5,51 @@ from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 import os
+import csv # Add csv import
+from .augmentation import augment_sequence # Import augmentation functions
 
 class SignLanguageDataset(Dataset):
-    def __init__(self, data_dir, labels_file, transform=None):
+    def __init__(self, processed_data_dir, labels_csv_path, apply_augmentation=False):
         """
         Khởi tạo Dataset.
         Args:
-            data_dir (str): Đường dẫn đến thư mục chứa các file .npy (processed_data).
-            labels_file (str): Đường dẫn đến file labels.csv.
-            transform (callable, optional): Một hàm biến đổi tùy chọn để áp dụng cho dữ liệu.
+            processed_data_dir (str): Đường dẫn đến thư mục chứa các file .npy đã tiền xử lý (processed_data_60_201).
+            labels_csv_path (str): Đường dẫn đến file labels.csv gốc.
+            apply_augmentation (bool): Có áp dụng tăng cường dữ liệu hay không.
         """
-        self.data_dir = data_dir
-        full_labels_df = pd.read_csv(labels_file)
-        self.transform = transform
+        self.processed_data_dir = processed_data_dir
+        self.apply_augmentation = apply_augmentation
 
-        # --- LỌC DATASET ĐỂ GIỮ LẠI N LỚP PHỔ BIẾN NHẤT ---
-        # --- SANITY CHECK: Chỉ giữ lại 4 mẫu từ 2 lớp đầu tiên ---
-        NUM_CLASSES_TO_KEEP = 2
-        SAMPLES_TO_KEEP = 4
-        print(f"--- LƯU Ý: ĐANG TRONG CHẾ ĐỘ SANITY CHECK ---")
-        print(f"--- Giữ lại {SAMPLES_TO_KEEP} mẫu từ {NUM_CLASSES_TO_KEEP} lớp đầu tiên ---")
-
-        # Tìm N lớp phổ biến nhất
-        top_labels = full_labels_df['label'].value_counts().nlargest(NUM_CLASSES_TO_KEEP).index.tolist()
-
-        # Lọc dataframe để chỉ chứa các mẫu thuộc các lớp này
-        self.labels_df = full_labels_df[full_labels_df['label'].isin(top_labels)].reset_index(drop=True)
-
-        # Giữ lại chỉ SAMPLES_TO_KEEP mẫu đầu tiên
-        self.labels_df = self.labels_df.head(SAMPLES_TO_KEEP)
+        # Đọc file labels.csv gốc để có ánh xạ filename -> label
+        original_labels_df = pd.read_csv(labels_csv_path)
         
-        print(f"Các lớp được giữ lại: {top_labels}")
-        print(f"Số lượng mẫu sau khi lọc: {len(self.labels_df)}")
+        # Tạo danh sách các mẫu dữ liệu từ thư mục processed_data_60_201
+        data_samples = []
+        for npy_file in os.listdir(processed_data_dir):
+            if npy_file.endswith('.npy'):
+                original_mp4_filename = npy_file.replace('.npy', '.mp4')
+                
+                # Tìm label tương ứng từ original_labels_df
+                # Đảm bảo cột 'filename' trong labels.csv chứa tên file .mp4
+                label_row = original_labels_df[original_labels_df['filename'] == original_mp4_filename]
+                
+                if not label_row.empty:
+                    label_str = label_row['label'].iloc[0]
+                    data_samples.append({
+                        'npy_filename': npy_file,
+                        'label': label_str
+                    })
+                # else:
+                    # print(f"Cảnh báo: Không tìm thấy nhãn cho file {original_mp4_filename}")
 
+        self.labels_df = pd.DataFrame(data_samples)
 
         # Ánh xạ các nhãn (tên ký hiệu) thành các số nguyên (ID)
-        # Ví dụ: "XIN CHAO" -> 0, "CAM ON" -> 1, ...
         self.label_to_id = {label: i for i, label in enumerate(self.labels_df['label'].unique())}
         self.id_to_label = {i: label for label, i in self.label_to_id.items()}
 
-        print(f"Đã tải {len(self.labels_df)} mẫu dữ liệu từ {labels_file}")
+        print(f"Đã tải {len(self.labels_df)} mẫu dữ liệu đã tiền xử lý từ {processed_data_dir}")
         print(f"Tổng số lớp (ký hiệu) duy nhất: {len(self.label_to_id)}")
-        # print(f"Ánh xạ nhãn sang ID: {self.label_to_id}") # Có thể bỏ comment để xem ánh xạ
 
     def __len__(self):
         """
@@ -64,30 +67,25 @@ class SignLanguageDataset(Dataset):
         """
         # Lấy thông tin về mẫu dữ liệu từ DataFrame
         row = self.labels_df.iloc[idx]
-        mp4_file_name = row['filename']  # Lấy tên file .mp4 từ cột 'filename'
-        label_str = row['label']         # Nhãn dạng chuỗi (ví dụ: "XIN CHAO")
-
-        # Thay đổi đuôi file từ .mp4 thành .npy
-        npy_file_name = mp4_file_name.replace('.mp4', '.npy')
+        npy_file_name = row['npy_filename']
+        label_str = row['label']
 
         # Xây dựng đường dẫn đầy đủ đến file .npy
-        npy_file_path = os.path.join(self.data_dir, npy_file_name)
+        npy_file_path = os.path.join(self.processed_data_dir, npy_file_name)
 
         # Tải dữ liệu landmarks từ file .npy
-        # Dữ liệu này có dạng (số_frame, số_landmark, số_tọa_độ_xyz)
+        # Dữ liệu này có dạng (60, 201)
         landmarks = np.load(npy_file_path)
+
+        # Áp dụng tăng cường dữ liệu nếu được yêu cầu
+        if self.apply_augmentation:
+            landmarks = augment_sequence(landmarks) # num_augmentations được xử lý bên trong augment_sequence
 
         # Chuyển đổi nhãn chuỗi thành ID số nguyên
         label_id = self.label_to_id[label_str]
 
         # Chuyển đổi dữ liệu numpy thành PyTorch Tensor
-        # torch.float32 là kiểu dữ liệu chuẩn cho đầu vào mô hình
         landmarks_tensor = torch.tensor(landmarks, dtype=torch.float32)
-        # Nhãn thường là số nguyên, nên dùng torch.long
         label_id_tensor = torch.tensor(label_id, dtype=torch.long)
-
-        # Áp dụng các biến đổi (transform) nếu có
-        if self.transform:
-            landmarks_tensor = self.transform(landmarks_tensor)
 
         return landmarks_tensor, label_id_tensor

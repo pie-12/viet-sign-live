@@ -4,75 +4,100 @@ import torch
 import torch.nn as nn
 
 class BiLSTMClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, num_classes, dropout_rate=0.5):
+    def __init__(self, num_classes, input_size=201):
         """
-        Khởi tạo mô hình Bi-LSTM để phân loại ngôn ngữ ký hiệu.
+        Khởi tạo mô hình Bi-LSTM sâu để phân loại ngôn ngữ ký hiệu dựa trên kiến trúc trong báo cáo.
 
         Args:
-            input_size (int): Kích thước của mỗi frame đầu vào (số lượng đặc trưng landmarks).
-                              Trong trường hợp của chúng ta là 258.
-            hidden_size (int): Số lượng đặc trưng trong trạng thái ẩn (hidden state) của LSTM.
-                               Đây là một siêu tham số (hyperparameter) có thể điều chỉnh.
-            num_layers (int): Số lượng lớp LSTM xếp chồng lên nhau.
             num_classes (int): Số lượng lớp đầu ra (số lượng ký hiệu duy nhất).
-                               Trong trường hợp của chúng ta là 3315.
-            dropout_rate (float): Tỷ lệ dropout để chống overfitting.
+            input_size (int): Kích thước của mỗi frame đầu vào (số lượng đặc trưng landmarks). Mặc định là 201.
         """
         super(BiLSTMClassifier, self).__init__()
 
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.num_classes = num_classes
+        # Các hằng số cho kiến trúc mô hình
+        lstm_hidden_size = 256
+        lstm_dropout = 0.3
+        dense1_units = 512
+        dense2_units = 256
+        dense_dropout = 0.5
 
-        # Lớp Bi-LSTM
-        # batch_first=True: Đầu vào và đầu ra sẽ có dạng (batch_size, sequence_length, features)
-        # bidirectional=True: Sử dụng Bi-LSTM (chạy cả hai chiều)
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers,
-                            batch_first=True, bidirectional=True, dropout=dropout_rate)
+        # --- Lớp Bi-LSTM đầu tiên ---
+        self.lstm1 = nn.LSTM(input_size, lstm_hidden_size, num_layers=1,
+                             batch_first=True, bidirectional=True, dropout=lstm_dropout)
+        self.bn1 = nn.BatchNorm1d(lstm_hidden_size * 2) # *2 vì Bi-directional
 
-        # Lớp Linear (fully connected layer) để phân loại đầu ra
-        # Vì là Bi-LSTM, hidden state cuối cùng sẽ có kích thước gấp đôi (hidden_size * 2)
-        self.fc = nn.Linear(hidden_size * 2, num_classes)
+        # --- Lớp Bi-LSTM thứ hai ---
+        self.lstm2 = nn.LSTM(lstm_hidden_size * 2, lstm_hidden_size, num_layers=1,
+                             batch_first=True, bidirectional=True, dropout=lstm_dropout)
+        self.bn2 = nn.BatchNorm1d(lstm_hidden_size * 2)
 
-        # Lớp Dropout (để chống overfitting)
-        self.dropout = nn.Dropout(dropout_rate)
+        # --- Lớp Bi-LSTM thứ ba (không trả về sequence) ---
+        self.lstm3 = nn.LSTM(lstm_hidden_size * 2, lstm_hidden_size, num_layers=1,
+                             batch_first=True, bidirectional=True, dropout=lstm_dropout)
+        self.bn3 = nn.BatchNorm1d(lstm_hidden_size * 2) # Output của lstm3 là (batch_size, hidden_size * 2)
+
+        # --- Các lớp Dense ---
+        self.fc1 = nn.Linear(lstm_hidden_size * 2, dense1_units)
+        self.bn4 = nn.BatchNorm1d(dense1_units)
+        self.dropout1 = nn.Dropout(dense_dropout)
+        self.relu1 = nn.ReLU()
+
+        self.fc2 = nn.Linear(dense1_units, dense2_units)
+        self.bn5 = nn.BatchNorm1d(dense2_units)
+        self.dropout2 = nn.Dropout(dense_dropout)
+        self.relu2 = nn.ReLU()
+
+        # --- Lớp đầu ra ---
+        self.output_layer = nn.Linear(dense2_units, num_classes)
 
     def forward(self, x):
         """
         Phương thức forward định nghĩa cách dữ liệu đi qua mô hình.
 
         Args:
-            x (torch.Tensor): Tensor đầu vào có dạng (batch_size, sequence_length, input_size).
-                              Đây chính là landmarks_batch đã được đệm từ DataLoader.
+            x (torch.Tensor): Tensor đầu vào có dạng (batch_size, sequence_length=60, input_size=201).
 
         Returns:
             torch.Tensor: Logits đầu ra có dạng (batch_size, num_classes).
         """
-        # Khởi tạo trạng thái ẩn và trạng thái tế bào ban đầu (hidden state và cell state)
-        # cho LSTM. Thường khởi tạo bằng 0.
-        # hidden_state có dạng (num_layers * num_directions, batch_size, hidden_size)
-        # num_directions = 2 vì chúng ta dùng Bi-LSTM
-        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)
+        batch_size, seq_len, _ = x.size()
 
-        # Truyền dữ liệu qua lớp LSTM
-        # out: output features from the last layer of the LSTM (batch_size, sequence_length, num_directions * hidden_size)
-        # (hn, cn): final hidden state and cell state for each layer
-        out, (hn, cn) = self.lstm(x, (h0, c0))
+        # --- Qua Bi-LSTM 1 ---
+        # input: (batch, seq_len, input_size) -> (batch, seq_len, hidden_size * 2)
+        out1, _ = self.lstm1(x)
+        # BatchNorm1d mong đợi đầu vào (batch_size, features, sequence_length)
+        # Chúng ta có (batch_size, sequence_length, features) -> transpose để phù hợp
+        out1 = self.bn1(out1.transpose(1, 2)).transpose(1, 2)
+        
+        # --- Qua Bi-LSTM 2 ---
+        out2, _ = self.lstm2(out1)
+        out2 = self.bn2(out2.transpose(1, 2)).transpose(1, 2)
 
-        # Lấy hidden state của lớp cuối cùng (last layer) và chiều cuối cùng (last direction)
+        # --- Qua Bi-LSTM 3 ---
+        # Lớp này không trả về sequence, mà chỉ trả về output cuối cùng
+        # out3: (batch_size, hidden_size * 2)
+        out3, (hn, cn) = self.lstm3(out2)
+        # Lấy hidden state cuối cùng từ cả hai chiều
         # hn có dạng (num_layers * num_directions, batch_size, hidden_size)
-        # Chúng ta cần hidden state của lớp cuối cùng (num_layers - 1) và cả hai chiều (forward và backward)
-        # Để lấy hidden state của lớp cuối cùng từ cả hai chiều:
-        # hn[-2, :, :] là hidden state của lớp cuối cùng, chiều forward
-        # hn[-1, :, :] là hidden state của lớp cuối cùng, chiều backward
-        # Chúng ta nối chúng lại (concatenate)
-        final_hidden_state = torch.cat((hn[-2, :, :], hn[-1, :, :]), dim=1)
+        # Vì num_layers=1 cho mỗi lstm, chúng ta lấy hn[0] (forward) và hn[1] (backward)
+        # Nối chúng lại
+        final_lstm_output = torch.cat((hn[0, :, :], hn[1, :, :]), dim=1)
+        
+        # BatchNorm3d cho tensor 2D (batch_size, features)
+        final_lstm_output = self.bn3(final_lstm_output)
+        
+        # --- Qua các lớp Dense ---
+        out = self.fc1(final_lstm_output)
+        out = self.bn4(out)
+        out = self.relu1(out)
+        out = self.dropout1(out)
 
-        # Áp dụng Dropout
-        final_hidden_state = self.dropout(final_hidden_state)
+        out = self.fc2(out)
+        out = self.bn5(out)
+        out = self.relu2(out)
+        out = self.dropout2(out)
 
-        # Truyền qua lớp Linear để có logits đầu ra
-        logits = self.fc(final_hidden_state)
+        # --- Lớp đầu ra ---
+        logits = self.output_layer(out)
 
         return logits
