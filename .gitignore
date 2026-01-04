@@ -1,29 +1,3 @@
-# MÃ´i trÆ°á»ng áº£o cá»§a Python
-.venv/
-
-# ThÆ° má»¥c cache cá»§a Python
-__pycache__/
-
-# ThÆ° má»¥c cÃ i Ä‘áº·t cá»§a VSCode
-.vscode/
-
-NOTES.md
-CONTINUATION_PROMPT.md
-
-
-.gemini/
-gha-creds-.json
-
-# Ignore video data
-data/videos_mp4/
-
-# Ignore processed data
-data/processed_data/
-data/processed_data_60_201/
-data/landmarks_npy/
-
-# Ignore model checkpoints
-*.pth
-
-# Ignore temporary search script
-temp_search_timm.py
+*.npy
+*.mp4
+*.npz

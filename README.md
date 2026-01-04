@@ -1,73 +1,74 @@
-# Viet Sign Live - Trợ lý phiên dịch Ngôn ngữ Ký hiệu Việt Nam
-
-Dự án "Viet Sign Live" là một ứng dụng desktop nhằm mục đích phiên dịch Ngôn ngữ Ký hiệu Việt Nam (VSL) sang văn bản và giọng nói Tiếng Việt theo thời gian thực. Dự án được phát triển như một phần của Đồ án cơ sở 4.
-
-## 🎯 Mục tiêu
-
--   **Nhận diện thời gian thực:** Sử dụng webcam để nhận diện các ký hiệu VSL riêng lẻ (isolated signs).
--   **Phiên dịch đa phương thức:** Chuyển đổi ký hiệu được nhận diện thành văn bản và phát ra giọng nói tương ứng.
--   **Xử lý trên thiết bị:** Ưu tiên xử lý on-device để đảm bảo quyền riêng tư và tốc độ, chỉ sử dụng tọa độ landmarks thay vì hình ảnh/video gốc.
--   **Học hỏi & Nghiên cứu:** Dự án được xây dựng với mục tiêu chính là học hỏi và áp dụng các kỹ thuật Deep Learning vào bài toán nhận diện hành động.
-
-## 🛠️ Công nghệ (Tech Stack)
-
--   **Ngôn ngữ:** Python 3.11
--   **Trích xuất Đặc trưng:** MediaPipe (Holistic)
--   **Deep Learning Framework:** PyTorch
--   **Xử lý Video/Ảnh:** OpenCV
--   **Thao tác dữ liệu:** Pandas, NumPy
--   **Giao diện (dự kiến):** Gradio / PyQt
--   **Tối ưu hóa (dự kiến):** ONNX Runtime
-
-## 🗂️ Cấu trúc Dự án
-
+# VIETNAMESE SIGN LANGUAGE RECOGNITION
+A system for recognizing Vietnamese Sign Language using deep learning and computer vision techniques, tailored specifically for Vietnamese sign language.
+## Demo
+https://github.com/user-attachments/assets/c143c7f2-9a7c-4033-9c41-a196322e6b5d
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Running the Application](#running-the-application)
+  - [Training from Scratch](#training-from-scratch)
+## Overview
+The Vietnamese Sign Language Recognition system leverages deep learning models and computer vision to interpret Vietnamese sign language gestures. It uses MediaPipe for landmark detection, TensorFlow for model training, and Streamlit for a user-friendly interface. The system supports recognition through video files or live webcam feeds.
+## Features
+- Automated Video Download: Automatically downloads videos for training data.
+- Data Preprocessing: Processes and augments data for model training.
+- Sign Language Recognition: Recognizes Vietnamese sign language gestures via video or webcam input.
+- User Interface: Provides a Streamlit-based web interface for easy interaction.
+## Requirements
+- **Software**:
+    - Python 3.8 or higher
+    - TensorFlow 2.x
+    - Scikit-learn
+    - MediaPipe
+    - OpenCV
+    - Streamlit
+- **Hardware**:
+    - Webcam (required for webcam recognition)
+    - GPU (recommended for model training)
+## Installation
+### 1. Clone the repository
+```bash
+git clone https://github.com/photienanh/Vietnamese-Sign-Language-Recognition
+cd Vietnamese-Sign-Language-Recognition
 ```
-VietSignLive/
-│
-├── .venv/                  # Môi trường ảo Python
-├── data/                   # (Thư mục dữ liệu không nằm trong repo)
-│   ├── videos_mp4/         # Dữ liệu video thô
-│   └── processed_data/     # Dữ liệu landmarks đã xử lý (.npy)
-│
-├── .gitignore              # Các file/thư mục được Git bỏ qua
-├── requirements.txt        # Danh sách các thư viện cần thiết
-├── preprocess.py           # Script tiền xử lý, chuyển video thành landmarks
-├── dataset.py              # PyTorch Dataset để tải dữ liệu landmarks
-├── test_dataset.py         # Script để kiểm tra Dataset
-├── downloader.py           # Script tiện ích để tải video
-└── README.md               # File này
+Alternatively, download the ZIP file from GitHub and extract it.
+### 2. Install Dependencies
+Ensure Python is installed. If not, you can download and install it from the official [Python website](https://www.python.org/downloads/). Then, install the required libraries:
+```bash
+pip install -r requirements.txt
+```
+## Usage
+The system can be used either by running the pre-trained model or by training a new model from scratch.
+### Running the Application
+To use the pre-trained model with the Streamlit interface:
+```bash
+streamlit run main.py
+```
+This launches a web interface where you can upload videos or use a webcam for sign language recognition.
+### Training from Scratch
+To train a new model, follow these steps:
+1. Clear Previous Data (optional).
+```bash
+Get-ChildItem -Path "./" -Directory | Remove-Item -Recurse -Force
+```
+2. Download Training Data.
+```bash
+python download_data.py
 ```
 
-## 🚀 Cài đặt & Thiết lập
+3. Process Data.
+```bash
+python create_data_augment.py
+```
 
-1.  **Clone repository:**
-    ```bash
-    git clone https://github.com/pie-12/viet-sign-live.git
-    cd viet-sign-live
-    ```
-
-2.  **Tạo và kích hoạt môi trường ảo:**
-    ```bash
-    # Tạo môi trường ảo
-    python -m venv .venv
-
-    # Kích hoạt môi trường ảo (Windows)
-    .\.venv\Scripts\activate
-    ```
-
-3.  **Cài đặt các thư viện cần thiết:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-## 🏃 Cách sử dụng
-
-1.  **Tiền xử lý dữ liệu (Tùy chọn, nếu bạn có dữ liệu video thô):**
-    Chạy script `preprocess.py` để chuyển đổi các video `.mp4` thành các file landmarks `.npy`. Bạn cần cấu hình đường dẫn đến thư mục video và thư mục đầu ra trong file.
-
-2.  **Kiểm tra `Dataset`:**
-    Để đảm bảo `PyTorch Dataset` có thể đọc dữ liệu `.npy` và `labels.csv` một cách chính xác, hãy chạy script kiểm tra:
-    ```bash
-    python test_dataset.py
-    ```
-    *Lưu ý: Bạn cần cập nhật đường dẫn đến thư mục dữ liệu trong file `test_dataset.py` cho phù hợp với máy của bạn.*
+4. Train the Model.
+- Open ```training.ipynb``` in a Jupyter Notebook environment.
+- Run all cells to train the model.
+- Note: Training is computationally intensive and best performed on a GPU-enabled device.
+5. Run the Application.
+```bash
+streamlit run main.py
+```
