@@ -1,11 +1,14 @@
+numpy
 opencv-python
 mediapipe
 matplotlib
 tqdm
 streamlit
-tensorflow
+tensorflow>=2.12.0
 selenium
 scipy
 requests
 scikit-learn
 pandas
+Pillow
+protobuf==3.20.3
