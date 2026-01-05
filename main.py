@@ -8,17 +8,255 @@ import mediapipe as mp
 from scipy.interpolate import interp1d
 import time
 
-st.set_page_config(page_title="VSL Prediction", layout="centered")
+st.set_page_config(page_title="VSL Prediction", layout="centered", page_icon="🐋")
+
+# --- Custom CSS for High-Contrast Modern Dark UI with Premium Fonts & HUD ---
+st.markdown("""
+<style>
+    /* Import Premium Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Montserrat:wght@300;500;800&family=Space+Grotesk:wght@300;500;700&display=swap');
+    
+    /* GLOBAL THEME OVERRIDES */
+    html, body, [class*="css"] {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #FFFFFF;
+    }
+    
+    /* MAIN BACKGROUND */
+    .stApp {
+        background-color: #0E1117;
+        background-image: radial-gradient(circle at 50% 0%, #1a1c2c 0%, #0E1117 80%);
+    }
+
+    /* HEADER STYLE */
+    .header-container {
+        text-align: center;
+        padding: 3.5rem 1rem;
+        background: linear-gradient(135deg, #00F260 0%, #0575E6 100%);
+        border-radius: 24px;
+        margin-bottom: 2.5rem;
+        box-shadow: 0 15px 35px rgba(0, 242, 96, 0.2);
+    }
+    .header-title {
+        font-family: 'Orbitron', sans-serif;
+        color: #FFFFFF;
+        font-weight: 700;
+        font-size: 3.2rem;
+        margin: 0;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        text-shadow: 3px 3px 0px rgba(0,0,0,0.2);
+    }
+    .header-subtitle {
+        font-family: 'Montserrat', sans-serif;
+        color: #FFFFFF;
+        font-size: 1.1rem;
+        margin-top: 0.8rem;
+        font-weight: 300;
+        letter-spacing: 2px;
+        opacity: 0.9;
+    }
+    
+    /* SIDEBAR STYLE */
+    [data-testid="stSidebar"] {
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
+    }
+    .sidebar-header {
+        font-family: 'Montserrat', sans-serif;
+        color: #FFFFFF;
+        font-size: 1.2rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+        padding-left: 15px;
+        border-left: 4px solid #00F260;
+        margin-bottom: 2rem;
+        text-transform: uppercase;
+    }
+    
+    /* TOGGLE SWITCH STYLE (Modernizing Checkboxes) */
+    .stToggle label p {
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 0.9rem !important;
+        color: #E0E0E0 !important;
+        letter-spacing: 1px;
+    }
+    
+    /* SLIDER STYLE */
+    .stSlider label p {
+        font-family: 'Orbitron', sans-serif !important;
+        font-size: 0.9rem !important;
+        color: #00F260 !important;
+        letter-spacing: 1px;
+    }
+
+    /* BUTTON STYLE */
+    div.stButton > button {
+        font-family: 'Montserrat', sans-serif;
+        background: linear-gradient(90deg, #00F260 0%, #0575E6 100%);
+        color: white !important;
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 5px 15px rgba(5, 117, 230, 0.3);
+        width: 100%;
+        text-transform: uppercase;
+    }
+    div.stButton > button:hover {
+        transform: scale(1.02) translateY(-2px);
+        box-shadow: 0 10px 25px rgba(5, 117, 230, 0.5);
+        background: linear-gradient(90deg, #0575E6 0%, #00F260 100%);
+    }
+
+    /* TECH TEXT STYLE (For instructions) */
+    .tech-instruction {
+        font-family: 'Space Grotesk', sans-serif;
+        color: #A0C4FF;
+        font-size: 1rem;
+        background: rgba(5, 117, 230, 0.1);
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 3px solid #0575E6;
+        margin-bottom: 15px;
+    }
+    .tech-strong {
+        color: #00F260;
+        font-weight: 700;
+    }
+
+    /* FUTURISTIC HUD RESULT CARD */
+    .hud-card {
+        background: rgba(14, 17, 23, 0.8);
+        border: 1px solid #30363D;
+        border-top: 4px solid #00F260;
+        border-bottom: 4px solid #0575E6;
+        padding: 2rem;
+        border-radius: 16px;
+        position: relative;
+        box-shadow: 0 0 30px rgba(0, 242, 96, 0.1);
+        backdrop-filter: blur(10px);
+        margin-top: 1rem;
+        text-align: center;
+        overflow: hidden;
+    }
+    /* Corner Accents */
+    .hud-card::before {
+        content: '';
+        position: absolute;
+        top: 10px; left: 10px;
+        width: 20px; height: 20px;
+        border-top: 2px solid #fff;
+        border-left: 2px solid #fff;
+        opacity: 0.5;
+    }
+    .hud-card::after {
+        content: '';
+        position: absolute;
+        bottom: 10px; right: 10px;
+        width: 20px; height: 20px;
+        border-bottom: 2px solid #fff;
+        border-right: 2px solid #fff;
+        opacity: 0.5;
+    }
+
+    .prediction-label {
+        font-family: 'Orbitron', sans-serif;
+        color: #8b949e;
+        font-size: 0.9rem;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+    }
+    .prediction-text {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: #fff;
+        text-transform: uppercase;
+        margin: 0.5rem 0;
+        text-shadow: 0 0 20px rgba(0, 242, 96, 0.5);
+        background: -webkit-linear-gradient(#fff 40%, #a0c4ff 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1.1;
+    }
+    .confidence-container {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+    .confidence-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #00F260;
+    }
+    .confidence-bar-bg {
+        width: 80%;
+        height: 6px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .confidence-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #00F260, #0575E6);
+        border-radius: 4px;
+        box-shadow: 0 0 10px #00F260;
+    }
+
+    /* TABS STYLE */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #00F260 !important;
+        border-bottom-color: #00F260 !important;
+    }
+    
+    /* Author Info Box */
+    .author-info {
+        padding: 1.2rem;
+        background: linear-gradient(180deg, rgba(30, 30, 30, 0.5) 0%, rgba(10, 10, 10, 0.5) 100%);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 3rem;
+    }
+    .author-label {
+        font-family: 'Orbitron', sans-serif;
+        color: #888;
+        font-size: 0.7rem;
+        letter-spacing: 2px;
+        margin-bottom: 4px;
+        display: block;
+    }
+    .author-val {
+        color: #FFFFFF;
+        font-weight: 600;
+        font-size: 0.95rem;
+        font-family: 'Space Grotesk', sans-serif;
+        display: block;
+        margin-bottom: 12px;
+    }
+
+</style>
+""", unsafe_allow_html=True)
 
 # --- Hero Header ---
 st.markdown("""
-    <div style="text-align: center;">
-        <h1 style="color: #008080;">VSL RECOGNITION SYSTEM</h1>
-        <p style="color: gray; font-size: 1.2em;">Hệ thống nhận diện Ngôn ngữ ký hiệu Việt Nam</p>
-        <code style="font-size: 0.8em;">Input: 60x201 | Model: BiLSTM | Labels: 2764</code>
+    <div class="header-container">
+        <h1 class="header-title">VIET SIGN LIVE</h1>
+        <p class="header-subtitle">ADVANCED SIGN LANGUAGE RECOGNITION</p>
     </div>
 """, unsafe_allow_html=True)
-st.divider()
 
 mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
@@ -64,22 +302,20 @@ def mediapipe_detection(image, model):
     return image, results
 
 def draw_styled_landmarks(image, results):
-    # Pose
     mp_drawing.draw_landmarks(
         image, results.pose_landmarks, mp_holistic.POSE_CONNECTIONS,
-        mp_drawing.DrawingSpec(color=(80,22,10), thickness=2, circle_radius=4),
-        mp_drawing.DrawingSpec(color=(80,44,121), thickness=2, circle_radius=2)
+        mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=4),
+        mp_drawing.DrawingSpec(color=(0, 242, 96), thickness=2, circle_radius=2)
     )
-    # Hands
     mp_drawing.draw_landmarks(
         image, results.left_hand_landmarks, mp_holistic.HAND_CONNECTIONS,
-        mp_drawing.DrawingSpec(color=(121,22,76), thickness=2, circle_radius=4),
-        mp_drawing.DrawingSpec(color=(121,44,250), thickness=2, circle_radius=2)
+        mp_drawing.DrawingSpec(color=(5, 117, 230), thickness=2, circle_radius=4),
+        mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=2)
     )
     mp_drawing.draw_landmarks(
         image, results.right_hand_landmarks, mp_holistic.HAND_CONNECTIONS,
-        mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=4),
-        mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2)
+        mp_drawing.DrawingSpec(color=(5, 117, 230), thickness=2, circle_radius=4),
+        mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2, circle_radius=2)
     )
 
 def extract_keypoints(results):
@@ -128,47 +364,56 @@ def sequence_frames(video_path, holistic):
   cap.release()
   return sequence_frames
 
-def process_webcam_to_sequence(duration_seconds, show_landmarks):
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+def process_webcam_to_sequence(duration_seconds, show_landmarks, holistic):
+    # Đặt độ phân giải 1280x720 (16:9) để khớp với dữ liệu training
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
     sequence = []
     stframe = st.empty()
     status_slot = st.empty()
     
-    # Khởi tạo model sớm
-    holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
-
     try:
-        # --- Giai đoạn 1: Đếm ngược trực tiếp trên camera ---
+        status_slot.warning("⏳ SYSTEM INITIALIZING...")
+        while not cap.isOpened():
+            time.sleep(0.1)
+
+        ret, frame = cap.read()
+        if not ret:
+            st.error("CAMERA ERROR")
+            return None
+        
+        stframe.image(cv2.flip(frame, 1), channels="BGR", width="stretch")
+        status_slot.success("CAMERA ONLINE")
+        time.sleep(0.5)
+
         countdown_start = time.time()
+        countdown_duration = 3
+        
         while True:
             ret, frame = cap.read()
             if not ret: break
             
             elapsed_countdown = time.time() - countdown_start
-            remaining = 3 - int(elapsed_countdown)
+            remaining = countdown_duration - int(elapsed_countdown)
             
-            # Lật ảnh cho giống gương
+            if remaining <= 0:
+                break
+            
             frame = cv2.flip(frame, 1)
             image, results = mediapipe_detection(frame, holistic)
             
             if show_landmarks:
                 draw_styled_landmarks(image, results)
             
-            # Hiển thị chữ đếm ngược lên ảnh
-            cv2.putText(image, f"READY: {remaining}", (150, 250), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 5, cv2.LINE_AA)
+            cv2.putText(image, f"{remaining}", (600, 360), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 242, 96), 15, cv2.LINE_AA)
             
-            stframe.image(image, channels="BGR", use_container_width=True)
-            status_slot.warning(f"⏳ Chuẩn bị... Bắt đầu sau {remaining} giây")
-            
-            if elapsed_countdown >= 3:
-                break
+            stframe.image(image, channels="BGR", width="stretch")
+            status_slot.warning(f"⏳ STANDBY... {remaining}")
 
-        # --- Giai đoạn 2: Ghi hình ---
         start_time = time.time()
         progress = st.progress(0)
         
@@ -183,7 +428,6 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks):
             frame = cv2.flip(frame, 1)
             image, results = mediapipe_detection(frame, holistic)
             
-            # Trích xuất keypoints
             keypoints = extract_keypoints(results)
             if keypoints is not None:
                 sequence.append(keypoints)
@@ -191,17 +435,15 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks):
             if show_landmarks:
                 draw_styled_landmarks(image, results)
             
-            # Hiển thị biểu tượng REC
-            cv2.circle(image, (30, 30), 10, (0, 0, 255), -1)
-            cv2.putText(image, "REC", (50, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            cv2.circle(image, (50, 50), 15, (0, 0, 255), -1)
+            cv2.putText(image, "REC", (80, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-            stframe.image(image, channels="BGR", use_container_width=True)
+            stframe.image(image, channels="BGR", width="stretch")
             progress.progress(min(elapsed_time / duration_seconds, 1.0))
-            status_slot.write(f"🔴 Đang ghi... {elapsed_time:.1f}/{duration_seconds}s")
+            status_slot.write(f"🔴 RECORDING... {elapsed_time:.1f}/{duration_seconds}s")
             
     finally:
         cap.release()
-        holistic.close()
         try:
             progress.empty()
         except:
@@ -209,81 +451,100 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks):
     
     return sequence
 
-# Streamlit App
-
 # --- Sidebar ---
-st.sidebar.title("⚙️ Cấu hình")
-duration_seconds = st.sidebar.slider("⏱️ Thời gian ghi hình (s)", 2, 10, 4)
-top_k = st.sidebar.slider("📊 Số lượng gợi ý (Top-k)", 1, 10, 1)
-show_landmarks = st.sidebar.checkbox("🦴 Hiển thị Landmarks", value=True)
-debug_mode = st.sidebar.checkbox("🐞 Chế độ Debug", value=False)
+with st.sidebar:
+    st.markdown('<div class="sidebar-header">CẤU HÌNH HỆ THỐNG</div>', unsafe_allow_html=True)
+    
+    duration_seconds = st.slider("THỜI LƯỢNG GHI (S)", 2, 10, 4)
+    top_k = st.slider("SỐ LƯỢNG KẾT QUẢ", 1, 5, 1)
+    
+    st.markdown("---")
+    
+    show_landmarks = st.toggle("HIỂN THỊ LANDMARKS", value=True)
+    debug_mode = st.toggle("CHẾ ĐỘ GỠ LỖI", value=False)
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("ℹ️ Hướng dẫn")
-st.sidebar.markdown("""
-1. Chọn chế độ **Webcam** hoặc **Video**.
-2. Nhấn nút **Ghi hình** hoặc **Tải video**.
-3. Xem kết quả dự đoán và độ tin cậy.
-""")
+    st.markdown("---")
+    
+    st.markdown(f"""
+    <div class="author-info">
+        <span class="author-label">DEVELOPED BY</span>
+        <span class="author-val">Tung Lam Nguyen</span>
+        <span class="author-label">STUDENT ID</span>
+        <span class="author-val">23IT138</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- Main UI ---
-tab_cam, tab_video = st.tabs(["📷 Webcam", "🎞️ Video file"])
+tab_cam, tab_video = st.tabs(["CAMERA TRỰC TIẾP", "TẢI LÊN VIDEO"])
 
 sequence = None
 holistic = mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 with tab_cam:
-    st.info(f"Nhấn nút bên dưới để bắt đầu ghi hình trong {duration_seconds} giây.")
-    if st.button("📸 Bắt đầu ghi hình"):
-        sequence = process_webcam_to_sequence(duration_seconds, show_landmarks)
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.markdown(f"""
+        <div class="tech-instruction">
+            ⏱️ Thời lượng mặc định: <span class="tech-strong">{duration_seconds} giây</span>. 
+            Nhấn nút bên cạnh để bắt đầu.
+        </div>
+        """, unsafe_allow_html=True)
+    with col2:
+        start_btn = st.button("KÍCH HOẠT CAMERA", type="primary", use_container_width=True)
+    
+    if start_btn:
+        sequence = process_webcam_to_sequence(duration_seconds, show_landmarks, holistic)
 
 with tab_video:
-    uploaded_file = st.file_uploader("Tải lên video (.mp4, .avi)", type=["mp4", "avi"])
+    st.markdown('<div class="tech-instruction">Hỗ trợ định dạng <span class="tech-strong">.MP4, .AVI</span>. Kéo thả file vào khung bên dưới.</div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("UPLOAD FILE", type=["mp4", "avi"])
+    
     if uploaded_file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
             tmp.write(uploaded_file.read())
             tmp_path = tmp.name
+        
         st.video(tmp_path)
-        if st.button("🔍 Phân tích video"):
-            sequence = sequence_frames(tmp_path, holistic)
+        if st.button("PHÂN TÍCH VIDEO", type="primary", use_container_width=True):
+            with st.spinner("PROCESSING..."):
+                sequence = sequence_frames(tmp_path, holistic)
 
 # Dự đoán
 if sequence is not None:
-    status_text = st.empty()
-    status_text.text("⏳ Processing keypoints...")
-    kp = interpolate_keypoints(sequence)
+    st.markdown("---")
     
-    status_text.text("🧠 Predicting...")
+    kp = interpolate_keypoints(sequence)
     result = model.predict(np.expand_dims(kp, axis=0))[0] 
-    status_text.empty()
 
-    # Xử lý kết quả
     top_indices = np.argsort(result)[-top_k:][::-1] 
     top_probs = result[top_indices]
     top_labels = [inv_label_map[i] for i in top_indices]
 
-    pred_label = top_labels[0]
-    confidence = top_probs[0]
+    # Hiển thị kết quả
+    col_res, col_chart = st.columns([1, 1])
 
-    # Hiển thị kết quả (Modern Layout)
-    st.divider()
-    col1, col2 = st.columns([2, 3])
+    with col_res:
+        st.markdown(f"""
+        <div class="hud-card">
+            <div class="prediction-label">PREDICTION RESULT</div>
+            <div class="prediction-text">{top_labels[0]}</div>
+            <div class="confidence-container">
+                <div class="confidence-value">{top_probs[0]:.1%}</div>
+                <div class="confidence-bar-bg">
+                    <div class="confidence-bar-fill" style="width: {top_probs[0]*100}%"></div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    with col1:
-        st.subheader("Kết quả dự đoán")
-        st.markdown(f"<h1 style='color: #4CAF50;'>{pred_label}</h1>", unsafe_allow_html=True)
-        st.metric("Độ tin cậy", f"{confidence:.1%}")
-
-    with col2:
-        st.subheader(f"Top {top_k} Khả năng")
+    with col_chart:
         if top_k > 1:
+            st.markdown("#### PROBABILITY CHART")
             chart_data = dict(zip(top_labels, top_probs))
-            st.bar_chart(chart_data)
+            st.bar_chart(chart_data, color="#00F260")
         else:
-            st.info("Tăng 'Top-k' trong sidebar để xem thêm các dự đoán khác.")
+            st.info("💡 Tăng 'SỐ LƯỢNG KẾT QUẢ' trong cấu hình để xem chi tiết hơn.")
 
     if debug_mode:
-        with st.expander("🛠️ Technical Details"):
-            st.write(f"**Input Shape:** {kp.shape}")
-            st.write(f"**Top Probs:** {top_probs}")
+        with st.expander("🛠️ SYSTEM LOGS"):
             st.json(dict(zip(top_labels, top_probs)))
