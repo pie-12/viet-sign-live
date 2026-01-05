@@ -8,7 +8,7 @@ import mediapipe as mp
 from scipy.interpolate import interp1d
 import time
 
-st.set_page_config(page_title="VSL Prediction", layout="centered", page_icon="🐋")
+st.set_page_config(page_title="VIET SIGN LIVE", layout="centered", page_icon="🐋")
 
 # --- Custom CSS for High-Contrast Modern Dark UI with Premium Fonts & HUD ---
 st.markdown("""
@@ -347,6 +347,53 @@ def interpolate_keypoints(keypoints_sequence, target_len = 60):
         interpolated_sequence[:, feature_idx] = interpolator(target_times)
     return interpolated_sequence
 
+def normalize_sequence(keypoints_sequence):
+    """
+    Chuẩn hóa chuỗi keypoints về khoảng [0, 1] dựa trên bounding box của cơ thể.
+    Giúp model nhận diện tốt hơn bất kể khoảng cách đứng xa/gần.
+    """
+    normalized_sequence = []
+    if not keypoints_sequence:
+        return normalized_sequence
+
+    for frame_flat in keypoints_sequence:
+        if frame_flat is None:
+            normalized_sequence.append(None)
+            continue
+        
+        try:
+            # Reshape về (201, 3) để xử lý
+            points = frame_flat.copy().reshape(-1, 3)
+            
+            # Chỉ lấy các điểm có tọa độ khác 0 (valid points)
+            valid_mask = np.any(points[:, :2] != 0, axis=1)
+            
+            if np.any(valid_mask):
+                x_coords = points[valid_mask, 0]
+                y_coords = points[valid_mask, 1]
+                
+                min_x, max_x = np.min(x_coords), np.max(x_coords)
+                min_y, max_y = np.min(y_coords), np.max(y_coords)
+                
+                # Chuẩn hóa X
+                if (max_x - min_x) > 1e-7:
+                    points[valid_mask, 0] = (x_coords - min_x) / (max_x - min_x)
+                elif x_coords.size > 0:
+                    points[valid_mask, 0] = 0.5 # Fallback nếu chỉ có 1 điểm hoặc thẳng hàng
+                    
+                # Chuẩn hóa Y
+                if (max_y - min_y) > 1e-7:
+                    points[valid_mask, 1] = (y_coords - min_y) / (max_y - min_y)
+                elif y_coords.size > 0:
+                    points[valid_mask, 1] = 0.5
+
+            normalized_sequence.append(points.flatten())
+            
+        except Exception:
+            normalized_sequence.append(frame_flat.copy()) # Giữ nguyên nếu lỗi
+
+    return normalized_sequence
+
 def sequence_frames(video_path, holistic):
   sequence_frames = []
   cap = cv2.VideoCapture(video_path)
@@ -365,10 +412,10 @@ def sequence_frames(video_path, holistic):
   return sequence_frames
 
 def process_webcam_to_sequence(duration_seconds, show_landmarks, holistic):
-    # Đặt độ phân giải 1280x720 (16:9) để khớp với dữ liệu training
+    # Đặt độ phân giải 640x480 (4:3) để kiểm tra tính ổn định
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
     sequence = []
@@ -402,13 +449,17 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks, holistic):
             if remaining <= 0:
                 break
             
-            frame = cv2.flip(frame, 1)
+            # Không lật frame đầu vào
             image, results = mediapipe_detection(frame, holistic)
             
             if show_landmarks:
                 draw_styled_landmarks(image, results)
             
-            cv2.putText(image, f"{remaining}", (600, 360), 
+            # Lật ảnh để hiển thị
+            image = cv2.flip(image, 1)
+
+            # Vẽ số đếm ngược (đã căn giữa cho 640x480)
+            cv2.putText(image, f"{remaining}", (280, 260), 
                         cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 242, 96), 15, cv2.LINE_AA)
             
             stframe.image(image, channels="BGR", width="stretch")
@@ -416,6 +467,7 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks, holistic):
 
         start_time = time.time()
         progress = st.progress(0)
+        frame_count = 0 # Biến đếm frame
         
         while True:
             ret, frame = cap.read()
@@ -425,18 +477,25 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks, holistic):
             if elapsed_time > duration_seconds:
                 break
             
-            frame = cv2.flip(frame, 1)
+            # QUAN TRỌNG: Không lật frame trước khi đưa vào MediaPipe
+            # Model cần dữ liệu gốc (Raw) để dự đoán chính xác
             image, results = mediapipe_detection(frame, holistic)
             
-            keypoints = extract_keypoints(results)
-            if keypoints is not None:
-                sequence.append(keypoints)
+            # KỸ THUẬT FRAME SKIPPING: Lấy 1 bỏ 1 (Giảm nhiễu & Khớp mật độ training)
+            frame_count += 1
+            if frame_count % 2 == 0:
+                keypoints = extract_keypoints(results)
+                if keypoints is not None:
+                    sequence.append(keypoints)
 
             if show_landmarks:
                 draw_styled_landmarks(image, results)
             
-            cv2.circle(image, (50, 50), 15, (0, 0, 255), -1)
-            cv2.putText(image, "REC", (80, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            # Chỉ lật hình ảnh KHI HIỂN THỊ (Hiệu ứng gương cho người dùng)
+            image = cv2.flip(image, 1)
+
+            cv2.circle(image, (image.shape[1] - 50, 50), 15, (0, 0, 255), -1) # Chỉnh lại vị trí chấm đỏ sau khi lật
+            cv2.putText(image, "REC", (image.shape[1] - 130, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
             stframe.image(image, channels="BGR", width="stretch")
             progress.progress(min(elapsed_time / duration_seconds, 1.0))
@@ -455,7 +514,8 @@ def process_webcam_to_sequence(duration_seconds, show_landmarks, holistic):
 with st.sidebar:
     st.markdown('<div class="sidebar-header">CẤU HÌNH HỆ THỐNG</div>', unsafe_allow_html=True)
     
-    duration_seconds = st.slider("THỜI LƯỢNG GHI (S)", 2, 10, 4)
+    # Giảm thời gian mặc định xuống 3s để tránh khoảng thừa (silence)
+    duration_seconds = st.slider("THỜI LƯỢNG GHI (S)", 2, 10, 3)
     top_k = st.slider("SỐ LƯỢNG KẾT QUẢ", 1, 5, 1)
     
     st.markdown("---")
@@ -513,38 +573,49 @@ with tab_video:
 if sequence is not None:
     st.markdown("---")
     
-    kp = interpolate_keypoints(sequence)
-    result = model.predict(np.expand_dims(kp, axis=0))[0] 
+    # BƯỚC QUAN TRỌNG: Chuẩn hóa dữ liệu đầu vào để khớp với training
+    norm_sequence = normalize_sequence(sequence)
+    
+    # Sau đó mới nội suy về 60 frames
+    kp = interpolate_keypoints(norm_sequence)
+    
+    if kp is not None: # Kiểm tra an toàn
+        # FIX QUAN TRỌNG: Kẹp giá trị (Clip) về [0, 1]
+        kp = np.clip(kp, 0.0, 1.0)
 
-    top_indices = np.argsort(result)[-top_k:][::-1] 
-    top_probs = result[top_indices]
-    top_labels = [inv_label_map[i] for i in top_indices]
+        # Chế độ chạy thật bằng Model
+        result = model.predict(np.expand_dims(kp, axis=0))[0] 
+        top_indices = np.argsort(result)[-top_k:][::-1] 
+        top_probs = result[top_indices]
+        top_labels = [inv_label_map[i] for i in top_indices]
 
-    # Hiển thị kết quả
-    col_res, col_chart = st.columns([1, 1])
+        # Hiển thị kết quả
+        col_res, col_chart = st.columns([1, 1])
 
-    with col_res:
-        st.markdown(f"""
-        <div class="hud-card">
-            <div class="prediction-label">PREDICTION RESULT</div>
-            <div class="prediction-text">{top_labels[0]}</div>
-            <div class="confidence-container">
-                <div class="confidence-value">{top_probs[0]:.1%}</div>
-                <div class="confidence-bar-bg">
-                    <div class="confidence-bar-fill" style="width: {top_probs[0]*100}%"></div>
+        with col_res:
+            st.markdown(f"""
+            <div class="hud-card">
+                <div class="prediction-label">PREDICTION RESULT</div>
+                <div class="prediction-text">{top_labels[0]}</div>
+                <div class="confidence-container">
+                    <div class="confidence-value">{top_probs[0]:.1%}</div>
+                    <div class="confidence-bar-bg">
+                        <div class="confidence-bar-fill" style="width: {top_probs[0]*100}%"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-    with col_chart:
-        if top_k > 1:
-            st.markdown("#### PROBABILITY CHART")
-            chart_data = dict(zip(top_labels, top_probs))
-            st.bar_chart(chart_data, color="#00F260")
-        else:
-            st.info("💡 Tăng 'SỐ LƯỢNG KẾT QUẢ' trong cấu hình để xem chi tiết hơn.")
-
+        with col_chart:
+            if top_k > 1:
+                st.markdown("#### PROBABILITY CHART")
+                chart_data = dict(zip(top_labels, top_probs))
+                st.bar_chart(chart_data, color="#00F260")
+            else:
+                st.info("💡 Tăng 'SỐ LƯỢNG KẾT QUẢ' trong cấu hình để xem chi tiết hơn.")
+    
     if debug_mode:
         with st.expander("🛠️ SYSTEM LOGS"):
             st.json(dict(zip(top_labels, top_probs)))
+    else:
+        pass

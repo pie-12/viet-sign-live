@@ -1,86 +1,104 @@
-# 🤟 VietSignLive - Vietnamese Sign Language Recognition
+# 🤟 VietSignLive - Hệ Thống Nhận Diện Ngôn Ngữ Ký Hiệu Việt Nam
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
-![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange.svg)
-![Streamlit](https://img.shields.io/badge/Streamlit-UI-red.svg)
-![MediaPipe](https://img.shields.io/badge/MediaPipe-Holistic-green.svg)
+![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![TensorFlow 2.x](https://img.shields.io/badge/TensorFlow-2.x-FF6F00?logo=tensorflow&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Holistic-00CC00?logo=google&logoColor=white)
 
-**VietSignLive** là hệ thống nhận diện Ngôn ngữ Ký hiệu Việt Nam (VSL) thời gian thực, sử dụng Deep Learning để chuyển đổi cử chỉ tay và cơ thể thành văn bản. Dự án được xây dựng với mục tiêu hỗ trợ giao tiếp cho cộng đồng người khiếm thính tại Việt Nam.
+**VietSignLive** là giải pháp ứng dụng Trí tuệ nhân tạo (AI) để nhận diện và phiên dịch Ngôn ngữ Ký hiệu Việt Nam (VSL) thành văn bản theo thời gian thực. Dự án được xây dựng với mục tiêu xóa bỏ rào cản giao tiếp cho cộng đồng người khiếm thính.
 
-## 🌟 Điểm Nổi Bật (Key Features)
+---
 
-- **Quy mô dữ liệu lớn:** Hỗ trợ nhận diện **2764 từ vựng** và bảng chữ cái, được thu thập từ nguồn chính thống (Bộ Giáo dục & Đào tạo).
-- **Mô hình mạnh mẽ:** Kiến trúc **Deep Bidirectional LSTM (3 lớp)** giúp nắm bắt tốt các chuỗi hành động theo thời gian.
-- **Kỹ thuật Augmentation nâng cao:** Áp dụng thuật toán **Inverse Kinematics (IK) 2D** để mô phỏng sự thay đổi khoảng cách tay và cấu trúc cơ thể, kết hợp với các phép biến đổi hình học (Scale, Rotate, Time Stretch).
-- **Giao diện hiện đại (HUD Style):** Ứng dụng Streamlit với thiết kế High-Contrast, hỗ trợ chế độ Webcam thời gian thực và upload video.
-- **Xử lý hiệu năng cao:** Tối ưu hóa MediaPipe Holistic để trích xuất 201 điểm đặc trưng (Landmarks) trên mỗi khung hình.
+## 🌟 Điểm Nổi Bật (Highlights)
+
+*   **Quy mô dữ liệu lớn:** Hỗ trợ nhận diện **2764 từ vựng**, bao gồm cả các từ địa phương (Bắc - Trung - Nam) và bảng chữ cái/số. Dữ liệu chuẩn được thu thập từ Từ điển của Bộ Giáo dục & Đào tạo.
+*   **Mô hình Deep Bi-LSTM:** Sử dụng kiến trúc mạng 3 lớp Bidirectional LSTM (Long Short-Term Memory) mạnh mẽ để nắm bắt các đặc trưng chuỗi thời gian của hành động phức tạp.
+*   **Siêu tăng cường dữ liệu (Advanced Augmentation):**
+    *   **Inverse Kinematics (IK 2D):** Thuật toán mô phỏng sự thay đổi khoảng cách tay nhưng vẫn giữ cấu trúc xương tự nhiên.
+    *   **Geometric Transforms:** Xoay, Tịnh tiến, Phóng to/Thu nhỏ (Scale) dựa trên trọng tâm cơ thể.
+    *   **Time Stretching:** Giả lập tốc độ ký hiệu nhanh/chậm.
+*   **Xử lý Real-time thông minh:**
+    *   **Normalization:** Tự động chuẩn hóa dữ liệu đầu vào theo tỷ lệ cơ thể người dùng (bất kể đứng xa/gần).
+    *   **Frame Skipping:** Kỹ thuật lấy mẫu thông minh để giảm nhiễu và đồng bộ FPS.
+*   **Giao diện HUD Modern:** Thiết kế Futuristic, trực quan với các chỉ số tin cậy (Confidence) và hiệu ứng gương.
+
+---
 
 ## 🛠️ Kiến Trúc Hệ Thống
 
-### 1. Data Pipeline
-- **Nguồn:** Crawl tự động từ `qipedc.moet.gov.vn` sử dụng Selenium.
-- **Preprocessing:**
-    - Trích xuất 201 keypoints (Pose + Left Hand + Right Hand) bằng MediaPipe.
-    - Chuẩn hóa độ dài chuỗi về **60 frames** (sử dụng nội suy Cubic).
-- **Augmentation:**
-    - `solve_2_link_ik_2d_v2`: Giải bài toán động học ngược để thay đổi vị trí tay tự nhiên.
-    - `time_stretch`: Co giãn thời gian để giả lập tốc độ ký hiệu nhanh/chậm.
+### 1. Luồng xử lý (Pipeline)
+1.  **Input:** Webcam Stream hoặc Video File.
+2.  **Feature Extraction:** MediaPipe Holistic trích xuất **201 điểm (Keypoints)** bao gồm Tư thế (Pose) và hai bàn tay (Hands).
+3.  **Preprocessing:**
+    *   **Clip & Normalize:** Chặn giá trị nhiễu và chuẩn hóa toạ độ về `[0, 1]`.
+    *   **Interpolation:** Thuật toán Cubic nắn chỉnh chuỗi frame về độ dài cố định **60 frames**.
+4.  **Inference:** Model Bi-LSTM dự đoán nhãn từ vựng.
+5.  **Output:** Hiển thị kết quả và biểu đồ xác suất lên giao diện Streamlit.
 
-### 2. Model Architecture
-Mô hình được huấn luyện trên TensorFlow/Keras:
-- **Input:** `(60 frames, 201 features)`
-- **Hidden Layers:**
-    - 3x Bidirectional LSTM Layers (256 units/layer)
-    - Batch Normalization & Dropout (0.3 - 0.5) để chống Overfitting.
-- **Output:** Dense Layer (2764 units) với hàm kích hoạt Softmax.
+### 2. Cấu trúc Model (Model Architecture)
+*   **Input Shape:** `(Batch, 60, 201)`
+*   **Hidden Layers:**
+    *   3x Bidirectional LSTM (256 units/layer)
+    *   Batch Normalization & Dropout (0.3 - 0.5) để tối ưu hóa và chống Overfitting.
+*   **Output Layer:** Dense 2764 (Softmax).
 
-## 🚀 Cài Đặt & Sử Dụng
+---
+
+## 🚀 Cài Đặt & Hướng Dẫn Sử Dụng
 
 ### Yêu cầu hệ thống
-- Python 3.8+
-- Webcam (cho tính năng nhận diện trực tiếp)
+*   Python 3.8 - 3.11
+*   Webcam (để chạy chế độ Real-time)
+*   RAM: 8GB+ (Khuyến nghị)
 
-### 1. Cài đặt thư viện
+### Bước 1: Cài đặt môi trường
 ```bash
+# Clone dự án
+git clone https://github.com/your-repo/VietSignLive.git
+cd VietSignLive
+
+# Cài đặt các thư viện phụ thuộc
 pip install -r requirements.txt
 ```
 
-### 2. Chạy ứng dụng
-Khởi động giao diện web local:
+### Bước 2: Chạy ứng dụng
+Mở terminal tại thư mục dự án và chạy lệnh:
 ```bash
 streamlit run main.py
 ```
-Sau khi chạy, truy cập vào đường dẫn hiển thị trên terminal (thường là `http://localhost:8501`).
+Trình duyệt sẽ tự động mở địa chỉ `http://localhost:8501`.
 
-### 3. Huấn luyện lại (Optional)
-Nếu bạn muốn tự huấn luyện lại mô hình từ dữ liệu gốc:
-1. Thu thập dữ liệu: `python download_data.py`
-2. Xử lý và Augment dữ liệu: `python create_data_augment.py`
-3. Huấn luyện: Mở và chạy notebook `trainning.ipynb`
+### Bước 3: Sử dụng
+*   **Tab Camera:** Chọn thời lượng ghi (ví dụ 3s), bấm nút **"KÍCH HOẠT CAMERA"**. Đợi đếm ngược và thực hiện ký hiệu.
+*   **Tab Video:** Tải file MP4/AVI lên để nhận diện.
 
-## 📂 Cấu Trúc Dự Án
+---
+
+## 📂 Cấu Trúc Thư Mục
 
 ```
 VietSignLive/
-├── main.py                 # Giao diện chính (Streamlit App)
-├── download_data.py        # Script crawl dữ liệu từ Bộ GD&ĐT
-├── augment_function.py     # Thư viện các hàm Data Augmentation (IK, Rotate...)
-├── create_data_augment.py  # Script tạo dataset huấn luyện
-├── trainning.ipynb         # Notebook huấn luyện model
-├── requirements.txt        # Danh sách thư viện
-├── Dataset/                # Chứa video gốc và file CSV nhãn
+├── main.py                 # Giao diện chính & Logic Real-time (Streamlit)
+├── trainning.ipynb         # Notebook xây dựng & huấn luyện Model
+├── augment_function.py     # Thư viện thuật toán Tăng cường dữ liệu (IK, Scale...)
+├── create_data_augment.py  # Script xử lý dữ liệu thô -> Training data (.npz)
+├── download_data.py        # Script crawl dữ liệu từ web Bộ GD&ĐT
+├── requirements.txt        # Danh sách thư viện Python
+├── Dataset/                # Thư mục chứa dữ liệu video & nhãn
 ├── Models/
 │   └── checkpoints/
-│       └── final_model.keras  # File model đã huấn luyện
+│       └── final_model.keras  # File Model đã huấn luyện (Core AI)
 └── Logs/
-    └── label_map.json      # Mapping giữa ID và nhãn từ vựng
+    └── label_map.json      # Mapping ID <-> Nhãn từ vựng
 ```
 
-## 👨‍💻 Tác Giả
+---
 
-**Tung Lam Nguyen**
-- Student ID: 23IT138
-- Project: Vietnamese Sign Language Recognition System
+## 👨‍💻 Tác Giả & Liên Hệ
+
+**Nguyễn Tùng Lâm (Tung Lam Nguyen)**
+*   **Student ID:** 23IT138
+*   **Dự án:** Đồ án Cơ sở / Nghiên cứu khoa học - Hệ thống nhận diện Ngôn ngữ Ký hiệu.
 
 ---
-*Dự án phục vụ mục đích học tập và nghiên cứu.*
+*Dự án được xây dựng với tâm huyết hỗ trợ cộng đồng. Mọi đóng góp và ý kiến phản hồi đều được trân trọng.*
